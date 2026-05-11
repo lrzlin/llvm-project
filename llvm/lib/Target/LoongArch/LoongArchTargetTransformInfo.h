@@ -93,6 +93,11 @@ public:
   getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
                         TTI::TargetCostKind CostKind) const override;
 
+  InstructionCost
+  getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
+                 TTI::CastContextHint CCH, TTI::TargetCostKind CostKind,
+                 const Instruction *I = nullptr) const override;
+
   bool prefersVectorizedAddressing() const override;
 
   TTI::MemCmpExpansionOptions

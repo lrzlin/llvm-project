@@ -57,7 +57,7 @@ struct CostKindCosts {
   }
 };
 using CostKindTblEntry = CostTblEntryT<CostKindCosts>;
-using TypeConversionCostTblEntry = TypeConversionCostTblEntryT<CostKindCosts>;
+using TypeConversionCostKindTblEntry = TypeConversionCostTblEntryT<CostKindCosts>;
 
 TypeSize LoongArchTTIImpl::getRegisterBitWidth(
     TargetTransformInfo::RegisterKind K) const {
@@ -1174,6 +1174,181 @@ LoongArchTTIImpl::getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
   }
 
   return BaseT::getIntrinsicInstrCost(ICA, CostKind);
+}
+
+InstructionCost LoongArchTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
+                                             Type *Src,
+                                             TTI::CastContextHint CCH,
+                                             TTI::TargetCostKind CostKind,
+                                             const Instruction *I) const {
+  int ISD = TLI->InstructionOpcodeToISD(Opcode);
+  assert(ISD && "Invalid opcode");
+
+  // The cost tables include both specific, custom (non-legal) src/dst type
+  // conversions and generic, legalized types. We test for customs first, before
+  // falling back to legalization.
+  static const TypeConversionCostKindTblEntry LASXConversionTbl[] = {
+    { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v16i8,  { 3, 1 } }, // vext2xv.d.b
+    { ISD::ZERO_EXTEND, MVT::v4i64,  MVT::v16i8,  { 3, 1 } }, // vext2xv.du.bu
+    { ISD::SIGN_EXTEND, MVT::v8i32,  MVT::v16i8,  { 3, 1 } }, // vext2xv.w.b
+    { ISD::ZERO_EXTEND, MVT::v8i32,  MVT::v16i8,  { 3, 1 } }, // vext2xv.wu.bu
+    { ISD::SIGN_EXTEND, MVT::v16i16, MVT::v16i8,  { 3, 1 } }, // vext2xv.h.b
+    { ISD::ZERO_EXTEND, MVT::v16i16, MVT::v16i8,  { 3, 1 } }, // vext2xv.hu.bu
+    { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v8i16,  { 3, 1 } }, // vext2xv.d.h
+    { ISD::ZERO_EXTEND, MVT::v4i64,  MVT::v8i16,  { 3, 1 } }, // vext2xv.du.hu
+    { ISD::SIGN_EXTEND, MVT::v8i32,  MVT::v8i16,  { 3, 1 } }, // vext2xv.w.h
+    { ISD::ZERO_EXTEND, MVT::v8i32,  MVT::v8i16,  { 3, 1 } }, // vext2xv.wu.hu
+    { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v4i32,  { 3, 1 } }, // vext2xv.d.w
+    { ISD::ZERO_EXTEND, MVT::v4i64,  MVT::v4i32,  { 3, 1 } }, // vext2xv.du.wu
+  };
+
+  static const TypeConversionCostKindTblEntry LSXConversionTbl[] = {
+    { ISD::ZERO_EXTEND, MVT::v2i64,  MVT::v16i8,  { 4, 4 } }, // vrepli.b + vilvl.b + vilvl.h + vilvl.w
+    { ISD::SIGN_EXTEND, MVT::v2i64,  MVT::v16i8,  { 3, 3 } }, // vextrins.b + vslli.d + vsrai.d
+    { ISD::ZERO_EXTEND, MVT::v4i32,  MVT::v16i8,  { 3, 3 } }, // vrepli.b + vilvl.b + vilvl.h
+    { ISD::SIGN_EXTEND, MVT::v4i32,  MVT::v16i8,  { 4, 4 } }, // vilvl.b + vilvl.h + vslli.w + vsrai.w
+    { ISD::ZERO_EXTEND, MVT::v8i16,  MVT::v16i8,  { 2, 2 } }, // vrepli.b + vilvl.b
+    { ISD::SIGN_EXTEND, MVT::v8i16,  MVT::v16i8,  { 2, 2 } }, // vslti.b + vilvl.b
+    { ISD::ZERO_EXTEND, MVT::v2i64,  MVT::v8i16,  { 2, 2 } }, // vrepli.b + vilvl.h + vilvl.w
+    { ISD::SIGN_EXTEND, MVT::v2i64,  MVT::v8i16,  { 3, 3 } }, // vextrins.h + vslli.d + vsrai.d
+    { ISD::ZERO_EXTEND, MVT::v4i32,  MVT::v8i16,  { 2, 2 } }, // vrepli.b + vilvl.h
+    { ISD::SIGN_EXTEND, MVT::v4i32,  MVT::v8i16,  { 2, 2 } }, // vslti.h + vilvl.h
+    { ISD::ZERO_EXTEND, MVT::v2i64,  MVT::v4i32,  { 2, 2 } }, // vrepli.b + vilvl.w
+    { ISD::SIGN_EXTEND, MVT::v2i64,  MVT::v4i32,  { 2, 2 } }, // vslti.w + vilvl.w
+
+    { ISD::SIGN_EXTEND, MVT::v8i32,  MVT::v8i16,  { 3, 3 } }, // vslti.h + vilvl.h + vilvh.h
+    { ISD::SIGN_EXTEND, MVT::v8i64,  MVT::v8i16,  { 9, 9 } },
+    { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v4i32,  { 3, 3 } }, // vslti.w + vilvl.w + vilvh.w
+    { ISD::SIGN_EXTEND, MVT::v16i16,  MVT::v16i8,  { 3, 3 } }, // vslti.b + vilvl.b + vilvh.b
+    { ISD::SIGN_EXTEND, MVT::v16i32,  MVT::v16i8,  { 9, 9 } },
+    { ISD::SIGN_EXTEND, MVT::v16i64,  MVT::v16i8,  { 21, 21 } },
+
+    // These truncates are really widening elements.
+    { ISD::TRUNCATE,    MVT::v2i1,   MVT::v2i32,  { 1, 1 } }, // vshuf4i.w
+    { ISD::TRUNCATE,    MVT::v2i1,   MVT::v2i16,  { 1, 1 } }, // vextrins.h
+    { ISD::TRUNCATE,    MVT::v2i1,   MVT::v2i8,   { 1, 1 } }, // vextrins.b
+    { ISD::TRUNCATE,    MVT::v4i1,   MVT::v4i16,  { 1, 1 } }, // vilvl.h
+    { ISD::TRUNCATE,    MVT::v4i1,   MVT::v4i8,   { 2, 1 } }, // vilvl.b + vilvl.h
+    { ISD::TRUNCATE,    MVT::v8i1,   MVT::v8i8,   { 1, 1 } }, // vilvl.b
+
+    { ISD::TRUNCATE,    MVT::v16i16, MVT::v16i32, { 2, 2 } }, // 2 * vpickev.h
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v16i32, { 3, 3 } }, // 2 * vpickev.h + vpickev.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i16,  { 1, 1 } }, // vpickev.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i32,  { 2, 2 } }, // vpickev.h + vpickev.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v2i64,  { 1, 1 } }, // vextrins.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i32,  { 2, 2 } }, // vpickev.h + vpickev.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i64,  { 3, 3 } }, // vpickev.w + vpickev.h + vpickev.b
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i32,  { 1, 1 } }, // vpickev.h
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v2i64,  { 1, 1 } }, // vextrins.h
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i64,  { 2, 2 } }, // vpickev.w + vpickev.h
+    { ISD::TRUNCATE,    MVT::v4i32,  MVT::v4i64,  { 1, 1 } }, // vpickev.w
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i32,  { 1, 1 } }, // vpickev.h
+
+    { ISD::SINT_TO_FP,  MVT::f32,    MVT::i32,    { 6, 5 } }, // movgr2fr.d + ffint.s.w
+    { ISD::SINT_TO_FP,  MVT::f64,    MVT::i32,    { 6, 5 } }, // movgr2fr.d + ffint.d.w
+    { ISD::SINT_TO_FP,  MVT::f32,    MVT::i64,    { 6, 5 } }, // movgr2fr.d + ffint.s.l
+    { ISD::SINT_TO_FP,  MVT::f64,    MVT::i64,    { 6, 5 } }, // movgr2fr.d + ffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v16i8,  { 8, 5 } }, // vilvl.b + vilvl.h + vslli.w + vsrai.w + vffint.s.w
+    { ISD::SINT_TO_FP,  MVT::v2f64,  MVT::v16i8,  { 9, 6 } }, // vilvl.b + vilvl.h + vilvl.w + vslli.d + vsrai.d + vffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v8i16,  { 6, 3 } }, // vslti.h + vilvl.h + vffint.s.w
+    { ISD::SINT_TO_FP,  MVT::v2f64,  MVT::v8i16,  { 8, 5 } }, // vilvl.h + vilvl.w + vslli.d + vsrai.d + vffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v4i32,  { 4, 1 } }, // vffint.s.w
+    { ISD::SINT_TO_FP,  MVT::v2f64,  MVT::v4i32,  { 6, 3 } }, // vslti.w + vilvl.w + vffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v2i64,  { 19, 19 } }, // 2 * (vpickve2gr.d + movgr2fr.d + ffint.s.l) + vextrins.w
+    { ISD::SINT_TO_FP,  MVT::v2f64,  MVT::v2i64,  { 4, 1 } }, // vffint.d.l
+
+    { ISD::UINT_TO_FP,  MVT::f32,    MVT::i32,    { 7, 6 } }, // bstrpick.d + movgr2fr.d + ffint.s.l
+    { ISD::UINT_TO_FP,  MVT::f64,    MVT::i32,    { 7, 6 } }, // bstrpick.d + movgr2fr.d + ffint.d.l
+    { ISD::UINT_TO_FP,  MVT::f32,    MVT::i64,    { 21, 21 } }, //
+    { ISD::UINT_TO_FP,  MVT::f64,    MVT::i64,    { 19, 21 } }, //
+    { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v16i8,  { 7, 4 } }, // vrepli.b + vilvl.b + vilvl.h + vffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v16i8,  { 8, 5 } }, // vrepli.b + vilvl.b + vilvl.h + vilvl.w + vffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v8i16,  { 6, 3 } }, // vrepli.b + vilvl.h + vffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v8i16,  { 7, 4 } }, // vrepli.b + vilvl.h + vilvl.w + vffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v2f32,  MVT::v2i32,  { 4, 1 } }, // vffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v4i32,  { 6, 3 } }, // vrepli.b + vilvl.w + vffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v4i32,  { 4, 1 } }, // vffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v2i64,  { 4, 1 } }, // vffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v2i64,  { 51, 51 } }, //
+
+    { ISD::FP_TO_SINT,  MVT::i32,    MVT::f32,    { 6, 5 } }, // ftintrz.w.s + movfr2gr.s
+    { ISD::FP_TO_SINT,  MVT::i64,    MVT::f32,    { 6, 5 } }, // ftintrz.l.s + movfr2gr.d
+    { ISD::FP_TO_SINT,  MVT::i32,    MVT::f64,    { 6, 5 } }, // ftintrz.w.d + movfr2gr.s
+    { ISD::FP_TO_SINT,  MVT::i64,    MVT::f64,    { 6, 5 } }, // ftintrz.l.d + movfr2gr.d
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v4f32,  { 6, 3 } }, // vftintrz.w.s + vpickev.h + vpickev.b
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v2f64,  { 5, 2 } }, // vftintrz.w.d + vextrins.b
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v4f32,  { 5, 2 } }, // vftintrz.w.s + vpickev.h
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v2f64,  { 6, 3 } }, // vftintrz.w.d + vshuf4i.h
+    { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v4f32,  { 4, 1 } }, // vftintrz.w.s
+    { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v2f64,  { 5, 2 } }, // vftintrz.w.d
+
+    { ISD::FP_TO_UINT,  MVT::i32,    MVT::f32,    { 6, 5 } }, // ftintrz.l.s + movfr2gr.d
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f32,    { 4, 1 } },
+    { ISD::FP_TO_UINT,  MVT::i32,    MVT::f64,    { 6, 5 } }, // ftintrz.l.d + movfr2gr.d
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f64,    {15, 1 } },
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v4f32,  { 6, 3 } }, // vftintrz.wu.s + vpickev.h + vpickev.b
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v2f64,  { 5, 2 } }, // vftintrz.l.d + vextrins.b
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v4f32,  { 5, 2 } }, // vftintrz.wu.s + vpickev.h
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v2f64,  { 5, 2 } }, // vftintrz.l.d + vextrins.h
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  { 4, 1 } }, // vftintrz.wu.s
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v2f64,  { 5, 2 } }, // vftintrz.l.d + vshuf4i.w
+  };
+
+  // Attempt to map directly to (simple) MVT types to let us match custom entries.
+  EVT SrcTy = TLI->getValueType(DL, Src);
+  EVT DstTy = TLI->getValueType(DL, Dst);
+
+  // The function getSimpleVT only handles simple value types.
+  if (SrcTy.isSimple() && DstTy.isSimple()) {
+    MVT SimpleSrcTy = SrcTy.getSimpleVT();
+    MVT SimpleDstTy = DstTy.getSimpleVT();
+
+    if (ST->hasExtLASX()) {
+      if (const auto *Entry = ConvertCostTableLookup(LASXConversionTbl, ISD,
+                                                     SimpleDstTy, SimpleSrcTy))
+        if (auto KindCost = Entry->Cost[CostKind])
+          return *KindCost;
+    }
+
+    if (ST->hasExtLSX()) {
+      if (const auto *Entry = ConvertCostTableLookup(LSXConversionTbl, ISD,
+                                                     SimpleDstTy, SimpleSrcTy))
+        if (auto KindCost = Entry->Cost[CostKind])
+          return *KindCost;
+    }
+  }
+
+  // Fall back to legalized types.
+  std::pair<InstructionCost, MVT> LTSrc = getTypeLegalizationCost(Src);
+  std::pair<InstructionCost, MVT> LTDest = getTypeLegalizationCost(Dst);
+
+  // If we're truncating to the same legalized type - just assume its free.
+  if (ISD == ISD::TRUNCATE && LTSrc.second == LTDest.second)
+    return TTI::TCC_Free;
+
+  if (ST->hasExtLASX()) {
+    if (const auto *Entry = ConvertCostTableLookup(LASXConversionTbl, ISD,
+                                                    LTDest.second, LTSrc.second))
+      if (auto KindCost = Entry->Cost[CostKind])
+        return *KindCost;
+  }
+
+  if (ST->hasExtLSX()) {
+    if (const auto *Entry = ConvertCostTableLookup(LSXConversionTbl, ISD,
+                                                   LTDest.second, LTSrc.second))
+      if (auto KindCost = Entry->Cost[CostKind])
+        return *KindCost;
+  }
+
+  // TODO: Allow non-throughput costs that aren't binary.
+  auto AdjustCost = [&CostKind](InstructionCost Cost,
+                                InstructionCost N = 1) -> InstructionCost {
+    if (CostKind != TTI::TCK_RecipThroughput)
+      return Cost == 0 ? 0 : N;
+    return Cost * N;
+  };
+  return AdjustCost(
+      BaseT::getCastInstrCost(Opcode, Dst, Src, CCH, CostKind, I));
 }
 
 bool LoongArchTTIImpl::prefersVectorizedAddressing() const { return false; }

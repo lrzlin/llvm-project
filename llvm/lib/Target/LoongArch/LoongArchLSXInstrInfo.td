@@ -36,6 +36,8 @@ def SDT_LoongArchVFCVT_S_D : SDTypeProfile<1, 2, [SDTCisVec<0>, SDTCisFP<0>,
                                                   SDTCisVec<1>, SDTCisFP<1>, SDTCisSameAs<1, 2>]>;
 def SDT_LoongArchVFCVTLH_D_S : SDTypeProfile<1, 1, [SDTCisVec<0>, SDTCisFP<0>,
                                                     SDTCisVec<1>, SDTCisFP<1>]>;
+def SDT_LoongArchVFTINTRZ_W_D : SDTypeProfile<1, 2, [SDTCisVec<0>, SDTCisInt<0>,
+                                                  SDTCisVec<1>, SDTCisFP<1>, SDTCisSameAs<1, 2>]>;
 
 // Target nodes.
 
@@ -106,6 +108,9 @@ def loongarch_vfcvth_d_s: SDNode<"LoongArchISD::VFCVTH", SDT_LoongArchVFCVTLH_D_
 // Vector rounded shift
 def loongarch_vsrlr: SDNode<"LoongArchISD::VSRLR", SDT_LoongArchV2R>;
 def loongarch_vsrar: SDNode<"LoongArchISD::VSRAR", SDT_LoongArchV2R>;
+
+// Vector double-precision convert to 32-bit integer
+def loongarch_vftintrz_w_d: SDNode<"LoongArchISD::VFTINTRZ", SDT_LoongArchVFTINTRZ_W_D>;
 
 def immZExt1 : ImmLeaf<GRLenVT, [{return isUInt<1>(Imm);}]>;
 def immZExt2 : ImmLeaf<GRLenVT, [{return isUInt<2>(Imm);}]>;
@@ -2312,6 +2317,10 @@ def : Pat<(v2i64 (fp_to_sint v2f64:$vj)), (VFTINTRZ_L_D v2f64:$vj)>;
 def : Pat<(v4i32 (fp_to_uint v4f32:$vj)), (VFTINTRZ_WU_S v4f32:$vj)>;
 def : Pat<(v2i64 (fp_to_uint v2f64:$vj)), (VFTINTRZ_LU_D v2f64:$vj)>;
 
+// VFTINTRZ_W_D
+def : Pat<(v4i32 (loongarch_vftintrz_w_d (v2f64 LSX128:$vj), (v2f64 LSX128:$vk))),
+          (VFTINTRZ_W_D LSX128:$vj, LSX128:$vk)>;
+
 // Vector loads floating-point constants
 def : Pat<(f32 f32imm_vldi:$in),
           (f32 (EXTRACT_SUBREG (VLDI (to_f32imm_vldi f32imm_vldi:$in)), sub_32))>;
@@ -2669,13 +2678,13 @@ foreach Inst = ["VFRECIPE_D", "VFRSQRTE_D"] in
   def : Pat<(deriveLSXIntrinsic<Inst>.ret (v2f64 LSX128:$vj)),
             (!cast<LAInst>(Inst) LSX128:$vj)>;
 
-def : Pat<(loongarch_vfrecipe v4f32:$src), 
+def : Pat<(loongarch_vfrecipe v4f32:$src),
           (VFRECIPE_S v4f32:$src)>;
-def : Pat<(loongarch_vfrecipe v2f64:$src), 
+def : Pat<(loongarch_vfrecipe v2f64:$src),
           (VFRECIPE_D v2f64:$src)>;
-def : Pat<(loongarch_vfrsqrte v4f32:$src), 
+def : Pat<(loongarch_vfrsqrte v4f32:$src),
           (VFRSQRTE_S v4f32:$src)>;
-def : Pat<(loongarch_vfrsqrte v2f64:$src), 
+def : Pat<(loongarch_vfrsqrte v2f64:$src),
           (VFRSQRTE_D v2f64:$src)>;
 }
 
