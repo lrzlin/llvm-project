@@ -467,7 +467,7 @@ InstructionCost LoongArchTTIImpl::getArithmeticInstrCost(
 
 InstructionCost LoongArchTTIImpl::getVectorInstrCost(
     unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
-    const Value *Op0, const Value *Op1) const {
+    const Value *Op0, const Value *Op1, TTI::VectorInstrContext VIC) const {
 
   assert(Val->isVectorTy() && "This must be a vector type");
 
@@ -531,7 +531,7 @@ InstructionCost LoongArchTTIImpl::getVectorInstrCost(
         return *KindCost + RegisterFileMoveCost;
   }
 
-  return BaseT::getVectorInstrCost(Opcode, Val, CostKind, Index, Op0, Op1) +
+  return BaseT::getVectorInstrCost(Opcode, Val, CostKind, Index, Op0, Op1, VIC) +
          RegisterFileMoveCost;
 }
 
