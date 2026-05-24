@@ -7762,8 +7762,33 @@ static SDValue performSINT_TO_FPCombine(SDNode *N, SelectionDAG &DAG,
     unsigned SrcEltBits = SrcVT.getScalarSizeInBits();
     unsigned DstEltBits = VT.getScalarSizeInBits();
 
-    if (SrcEltBits >= DstEltBits)
+    if (SrcEltBits >= DstEltBits) {
+      // Use vffint.s.l for vector signed i64 convert to float
+      if (SrcEltBits == 64 && DstEltBits == 32) {
+        if (Src.getOpcode() != ISD::CONCAT_VECTORS) {
+          SDValue Undef = DAG.getUNDEF(SrcVT);
+          SDValue Res =
+              DAG.getNode(LoongArchISD::VFFINT, DL, MVT::v4f32, Undef, Src);
+          return DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, MVT::v2f32, Res,
+                            DAG.getVectorIdxConstant(0, DL));
+        } else {
+          unsigned NumOps = Src.getNumOperands();
+          SmallVector<SDValue, 8> Parts;
+          for (unsigned i = 0; i < NumOps; i += 2) {
+            SDValue Lo = Src.getOperand(i);
+            SDValue Hi = Src.getOperand(i + 1);
+            Parts.push_back(
+                DAG.getNode(LoongArchISD::VFFINT, DL, MVT::v4f32, Hi, Lo));
+          }
+
+          if (Parts.size() == 1)
+            return Parts[0];
+          return DAG.getNode(ISD::CONCAT_VECTORS, DL, VT, Parts);
+        }
+      }
+
       return SDValue();
+    }
 
     MVT WidenEltVT = MVT::getIntegerVT(DstEltBits);
     MVT WidenSrcVT = MVT::getVectorVT(WidenEltVT, DstElts);
