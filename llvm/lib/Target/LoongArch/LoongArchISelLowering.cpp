@@ -7843,8 +7843,22 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
   MVT SrcVT = Src.getSimpleValueType();
   bool IsSigned = N->getOpcode() == ISD::FP_TO_SINT;
 
-  if (!Subtarget.hasExtLSX() || !DstVT.isVector() || !SrcVT.isVector())
+  if (!Subtarget.hasExtLSX())
     return SDValue();
+
+  if (!DstVT.isVector() && !SrcVT.isVector()) {
+    // Use vftintrz.lu.d for unsigned convert if we have LSX support.
+    if (!IsSigned && DstVT == MVT::i64) {
+      SDValue Ext = Src;
+      if (SrcVT == MVT::f32)
+        Ext = DAG.getNode(ISD::FP_EXTEND, DL, MVT::f64, Src);
+      Ext = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v2f64, Ext);
+      SDValue Conv = DAG.getNode(ISD::FP_TO_UINT, DL, MVT::v2i64, Ext);
+      return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, DstVT, Conv,
+                     DAG.getIntPtrConstant(0, DL));
+    }
+    return SDValue();
+  }
 
   unsigned SrcEltBits = SrcVT.getScalarSizeInBits();
   unsigned DstEltBits = DstVT.getScalarSizeInBits();

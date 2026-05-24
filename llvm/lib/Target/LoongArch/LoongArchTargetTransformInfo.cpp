@@ -1283,9 +1283,9 @@ InstructionCost LoongArchTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v2f64,  { 5, 2 } }, // vftintrz.w.d
 
     { ISD::FP_TO_UINT,  MVT::i32,    MVT::f32,    { 6, 5 } }, // ftintrz.l.s + movfr2gr.d
-    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f32,    { 4, 1 } },
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f32,    { 9, 6 } }, // fcvt.d.s + vftintrz.lu.d + vpickve2gr.d
     { ISD::FP_TO_UINT,  MVT::i32,    MVT::f64,    { 6, 5 } }, // ftintrz.l.d + movfr2gr.d
-    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f64,    {15, 1 } },
+    { ISD::FP_TO_UINT,  MVT::i64,    MVT::f64,    { 7, 5 } }, // vftintrz.lu.d + vpickve2gr.d
     { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v4f32,  { 6, 3 } }, // vftintrz.wu.s + vpickev.h + vpickev.b
     { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v2f64,  { 5, 2 } }, // vftintrz.l.d + vextrins.b
     { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v4f32,  { 5, 2 } }, // vftintrz.wu.s + vpickev.h
