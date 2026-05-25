@@ -1217,11 +1217,11 @@ InstructionCost LoongArchTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::SIGN_EXTEND, MVT::v2i64,  MVT::v4i32,  { 2, 2 } }, // vslti.w + vilvl.w
 
     { ISD::SIGN_EXTEND, MVT::v8i32,  MVT::v8i16,  { 3, 3 } }, // vslti.h + vilvl.h + vilvh.h
-    { ISD::SIGN_EXTEND, MVT::v8i64,  MVT::v8i16,  { 9, 9 } },
+    { ISD::SIGN_EXTEND, MVT::v8i64,  MVT::v8i16,  { 9, 9 } }, //
     { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v4i32,  { 3, 3 } }, // vslti.w + vilvl.w + vilvh.w
     { ISD::SIGN_EXTEND, MVT::v16i16,  MVT::v16i8,  { 3, 3 } }, // vslti.b + vilvl.b + vilvh.b
-    { ISD::SIGN_EXTEND, MVT::v16i32,  MVT::v16i8,  { 9, 9 } },
-    { ISD::SIGN_EXTEND, MVT::v16i64,  MVT::v16i8,  { 21, 21 } },
+    { ISD::SIGN_EXTEND, MVT::v16i32,  MVT::v16i8,  { 9, 9 } }, //
+    { ISD::SIGN_EXTEND, MVT::v16i64,  MVT::v16i8,  { 21, 21 } }, //
 
     // These truncates are really widening elements.
     { ISD::TRUNCATE,    MVT::v2i1,   MVT::v2i32,  { 1, 1 } }, // vshuf4i.w

@@ -7761,30 +7761,38 @@ static SDValue performSINT_TO_FPCombine(SDNode *N, SelectionDAG &DAG,
     unsigned DstElts = VT.getVectorNumElements();
     unsigned SrcEltBits = SrcVT.getScalarSizeInBits();
     unsigned DstEltBits = VT.getScalarSizeInBits();
+    bool UseXR = Subtarget.hasExtLASX() && DstElts > 2;
 
     if (SrcEltBits >= DstEltBits) {
       // Use vffint.s.l for vector signed i64 convert to float
       if (SrcEltBits == 64 && DstEltBits == 32) {
-        if (Src.getOpcode() != ISD::CONCAT_VECTORS) {
-          SDValue Undef = DAG.getUNDEF(SrcVT);
-          SDValue Res =
-              DAG.getNode(LoongArchISD::VFFINT, DL, MVT::v4f32, Undef, Src);
-          return DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, MVT::v2f32, Res,
-                            DAG.getVectorIdxConstant(0, DL));
-        } else {
-          unsigned NumOps = Src.getNumOperands();
-          SmallVector<SDValue, 8> Parts;
-          for (unsigned i = 0; i < NumOps; i += 2) {
-            SDValue Lo = Src.getOperand(i);
-            SDValue Hi = Src.getOperand(i + 1);
-            Parts.push_back(
-                DAG.getNode(LoongArchISD::VFFINT, DL, MVT::v4f32, Hi, Lo));
+        MVT NativeVT = UseXR ? MVT::v8f32 : MVT::v4f32;
+        bool InReg = true;
+        if (Src.getOpcode() == ISD::CONCAT_VECTORS)
+          InReg = false;
+
+        unsigned NumOps = InReg ? 1 : Src.getNumOperands();
+        SmallVector<SDValue, 8> Parts;
+        for (unsigned i = 0; i < NumOps; i += 2) {
+          SDValue Lo = InReg ? Src : Src.getOperand(i);
+          SDValue Hi = InReg ? Lo : Src.getOperand(i + 1);
+          SDValue Res = DAG.getNode(LoongArchISD::VFFINT, DL, NativeVT, Hi, Lo);
+
+          if (UseXR) {
+            Res = DAG.getBitcast(MVT::v4i64, Res);
+            Res = DAG.getNode(
+                LoongArchISD::XVPERMI, DL, MVT::v4i64, Res,
+                DAG.getConstant(0b11011000, DL, Subtarget.getGRLenVT()));
+            Res = DAG.getBitcast(NativeVT, Res);
           }
 
-          if (Parts.size() == 1)
-            return Parts[0];
-          return DAG.getNode(ISD::CONCAT_VECTORS, DL, VT, Parts);
+          Parts.push_back(Res);
         }
+
+        if (InReg)
+          return DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, VT, Parts[0],
+                             DAG.getVectorIdxConstant(0, DL));
+        return DAG.getNode(ISD::CONCAT_VECTORS, DL, VT, Parts);
       }
 
       return SDValue();
@@ -7880,7 +7888,7 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
       Ext = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v2f64, Ext);
       SDValue Conv = DAG.getNode(ISD::FP_TO_UINT, DL, MVT::v2i64, Ext);
       return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, DstVT, Conv,
-                     DAG.getIntPtrConstant(0, DL));
+                         DAG.getIntPtrConstant(0, DL));
     }
     return SDValue();
   }
