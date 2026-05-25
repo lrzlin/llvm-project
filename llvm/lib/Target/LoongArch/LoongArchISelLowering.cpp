@@ -7761,11 +7761,15 @@ static SDValue performSINT_TO_FPCombine(SDNode *N, SelectionDAG &DAG,
     unsigned DstElts = VT.getVectorNumElements();
     unsigned SrcEltBits = SrcVT.getScalarSizeInBits();
     unsigned DstEltBits = VT.getScalarSizeInBits();
-    bool UseXR = Subtarget.hasExtLASX() && DstElts > 2;
+    unsigned SrcBits = SrcVT.getScalarSizeInBits();
 
     if (SrcEltBits >= DstEltBits) {
       // Use vffint.s.l for vector signed i64 convert to float
       if (SrcEltBits == 64 && DstEltBits == 32) {
+        if (!isPowerOf2_32(DstElts))
+          return SDValue();
+
+        bool UseXR = Subtarget.hasExtLASX() && SrcBits > 128;
         MVT NativeVT = UseXR ? MVT::v8f32 : MVT::v4f32;
         bool InReg = true;
         if (Src.getOpcode() == ISD::CONCAT_VECTORS)
@@ -7894,18 +7898,18 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
   }
 
   unsigned SrcEltBits = SrcVT.getScalarSizeInBits();
+  unsigned SrcBits = SrcVT.getSizeInBits();
   unsigned DstEltBits = DstVT.getScalarSizeInBits();
   unsigned NumElts = DstVT.getVectorNumElements();
+
+  if (!isPowerOf2_32(NumElts))
+    return SDValue();
 
   if (DstEltBits < 32) {
     MVT PromoteVT = MVT::getVectorVT(MVT::getIntegerVT(32), NumElts);
     SDValue Conv = DAG.getNode(N->getOpcode(), DL, PromoteVT, Src);
     return DAG.getNode(ISD::TRUNCATE, DL, DstVT, Conv);
   }
-
-  // LASX has its own pattern for v4f64 to v4i32.
-  if (Subtarget.hasExtLASX() && NumElts >= 4)
-    return SDValue();
 
   if (SrcEltBits != 64 || DstEltBits != 32)
     return SDValue();
@@ -7914,28 +7918,34 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
     MVT TmpVT = MVT::getVectorVT(MVT::i64, NumElts);
     SDValue Tmp = DAG.getNode(ISD::FP_TO_SINT, DL, TmpVT, Src);
     return DAG.getNode(ISD::TRUNCATE, DL, DstVT, Tmp);
-  }
+  } else {
+    bool UseXR = Subtarget.hasExtLASX() && SrcBits > 128;
+    MVT NativeVT = UseXR ? MVT::v8i32 : MVT::v4i32;
+    bool InReg = true;
+    if (Src.getOpcode() == ISD::CONCAT_VECTORS)
+      InReg = false;
 
-  if (IsSigned && Src.getOpcode() != ISD::CONCAT_VECTORS) {
-    SDValue Undef = DAG.getUNDEF(SrcVT);
-    SDValue Res =
-        DAG.getNode(LoongArchISD::VFTINTRZ, DL, MVT::v4i32, Undef, Src);
-    return DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, MVT::v2i32, Res,
-                       DAG.getVectorIdxConstant(0, DL));
-  }
-
-  if (IsSigned && Src.getOpcode() == ISD::CONCAT_VECTORS) {
-    unsigned NumOps = Src.getNumOperands();
+    unsigned NumOps = InReg ? 1 : Src.getNumOperands();
     SmallVector<SDValue, 8> Parts;
     for (unsigned i = 0; i < NumOps; i += 2) {
-      SDValue Lo = Src.getOperand(i);
-      SDValue Hi = Src.getOperand(i + 1);
-      Parts.push_back(
-          DAG.getNode(LoongArchISD::VFTINTRZ, DL, MVT::v4i32, Hi, Lo));
+      SDValue Lo = InReg ? Src : Src.getOperand(i);
+      SDValue Hi = InReg ? Lo : Src.getOperand(i + 1);
+      SDValue Res = DAG.getNode(LoongArchISD::VFTINTRZ, DL, NativeVT, Hi, Lo);
+
+      if (UseXR) {
+        Res = DAG.getBitcast(MVT::v4i64, Res);
+        Res = DAG.getNode(
+            LoongArchISD::XVPERMI, DL, MVT::v4i64, Res,
+            DAG.getConstant(0b11011000, DL, Subtarget.getGRLenVT()));
+        Res = DAG.getBitcast(NativeVT, Res);
+      }
+
+      Parts.push_back(Res);
     }
 
-    if (Parts.size() == 1)
-      return Parts[0];
+    if (InReg)
+      return DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, DstVT, Parts[0],
+                         DAG.getVectorIdxConstant(0, DL));
     return DAG.getNode(ISD::CONCAT_VECTORS, DL, DstVT, Parts);
   }
 
@@ -7958,18 +7968,17 @@ static SDValue performTRUNCATECombine(SDNode *N, SelectionDAG &DAG,
   if (!VT.isVector())
     return SDValue();
 
-  unsigned DstNumElts = VT.getVectorNumElements();
+  unsigned NumElts = VT.getVectorNumElements();
   unsigned SrcBits = SrcVT.getSizeInBits();
   unsigned DstBits = VT.getSizeInBits();
   unsigned SrcEltBits = SrcVT.getScalarSizeInBits();
   unsigned DstEltBits = VT.getScalarSizeInBits();
   unsigned BlockBits = Subtarget.hasExtLASX() ? 256 : 128;
 
-  if (SrcBits < 128 || DstNumElts < 4 || DstBits > BlockBits)
+  if (SrcBits < 128 || NumElts < 4 || DstBits > BlockBits || !isPowerOf2_32(NumElts))
     return SDValue();
 
   SmallVector<SDValue, 8> Blocks;
-
   if (Src.getOpcode() == ISD::CONCAT_VECTORS) {
     for (unsigned i = 0; i < Src.getNumOperands(); i++)
       Blocks.push_back(Src.getOperand(i));
@@ -7993,7 +8002,7 @@ static SDValue performTRUNCATECombine(SDNode *N, SelectionDAG &DAG,
   }
 
   unsigned CurEltBits = SrcEltBits;
-  bool IsValidUpperBits = true;
+  bool IsValidUpperBits = SrcBits < BlockBits ? false : true;
   while (CurEltBits > DstEltBits) {
     unsigned NarrowBits = CurEltBits / 2;
     unsigned NarrowNumElts = BlockBits / NarrowBits;
