@@ -1188,6 +1188,13 @@ InstructionCost LoongArchTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
   // conversions and generic, legalized types. We test for customs first, before
   // falling back to legalization.
   static const TypeConversionCostKindTblEntry LASXConversionTbl[] = {
+    { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v4i1,   { 5, 3 } }, // vext2xv.du.wu + xvslli.d + xvsrai.d
+    { ISD::ZERO_EXTEND, MVT::v4i64,  MVT::v4i1,   { 5, 3 } }, // vrepli.w + vand.v + vext2xv.du.wu
+    { ISD::SIGN_EXTEND, MVT::v8i32,  MVT::v8i1,   { 5, 3 } }, // vext2xv.wu.hu + xvslli.w + xvsrai.w
+    { ISD::ZERO_EXTEND, MVT::v8i32,  MVT::v8i1,   { 5, 3 } }, // vrepli.h + vand.v + vext2xv.wu.hu
+    { ISD::SIGN_EXTEND, MVT::v16i16, MVT::v16i1,  { 5, 3 } }, // vext2xv.hu.bu + xvslli.h + xvsrai.h
+    { ISD::ZERO_EXTEND, MVT::v16i16, MVT::v16i1,  { 4, 2 } }, // vandi.b + vext2xv.hu.bu
+
     { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v16i8,  { 3, 1 } }, // vext2xv.d.b
     { ISD::ZERO_EXTEND, MVT::v4i64,  MVT::v16i8,  { 3, 1 } }, // vext2xv.du.bu
     { ISD::SIGN_EXTEND, MVT::v8i32,  MVT::v16i8,  { 3, 1 } }, // vext2xv.w.b
@@ -1243,6 +1250,9 @@ InstructionCost LoongArchTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i64,  { 2, 2 } }, // vpickev.w + vpickev.h
     { ISD::TRUNCATE,    MVT::v4i32,  MVT::v4i64,  { 1, 1 } }, // vpickev.w
     { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i32,  { 1, 1 } }, // vpickev.h
+
+    { ISD::FP_EXTEND,   MVT::v4f64,  MVT::v4f32,  { 7, 5 } }, // vfcvtl.d.s + vfcvth.d.s + vori.b
+    { ISD::FP_ROUND,    MVT::v4f32,  MVT::v4f64,  { 3, 2 } }, // vfcvt.s.d
 
     { ISD::SINT_TO_FP,  MVT::f32,    MVT::i32,    { 6, 5 } }, // movgr2fr.d + ffint.s.w
     { ISD::SINT_TO_FP,  MVT::f64,    MVT::i32,    { 6, 5 } }, // movgr2fr.d + ffint.d.w
