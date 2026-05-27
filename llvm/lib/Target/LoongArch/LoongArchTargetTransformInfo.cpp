@@ -1207,6 +1207,88 @@ InstructionCost LoongArchTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::ZERO_EXTEND, MVT::v8i32,  MVT::v8i16,  { 3, 1 } }, // vext2xv.wu.hu
     { ISD::SIGN_EXTEND, MVT::v4i64,  MVT::v4i32,  { 3, 1 } }, // vext2xv.d.w
     { ISD::ZERO_EXTEND, MVT::v4i64,  MVT::v4i32,  { 3, 1 } }, // vext2xv.du.wu
+
+    { ISD::FP_EXTEND,   MVT::v4f64,  MVT::v4f32,  { 6, 3 } }, // xvpermi.d + xvfcvtl.d.s
+    { ISD::FP_EXTEND,   MVT::v8f64,  MVT::v8f32,  { 9, 5 } }, // xvpermi.d + xvfcvtl.d.s + xvfcvth.d.s
+    { ISD::FP_ROUND,    MVT::v4f32,  MVT::v4f64,  { 6, 3 } }, // xvpermi.q + vfcvt.s.d
+    { ISD::FP_ROUND,    MVT::v8f32,  MVT::v8f64,  { 6, 3 } }, // xvfcvt.s.d + xvpermi.d
+
+    { ISD::TRUNCATE,    MVT::v4i1,   MVT::v4i64,  { 4, 2 } }, // xvpickev.w + xvpermi.d
+    { ISD::TRUNCATE,    MVT::v8i1,   MVT::v8i32,  { 4, 2 } }, // xvpickev.h + xvpermi.d
+    { ISD::TRUNCATE,    MVT::v16i1,  MVT::v16i16, { 4, 2 } }, // xvpickev.b + xvpermi.d
+    { ISD::TRUNCATE,    MVT::v8i1,   MVT::v8i64,  { 8, 4 } }, // xvpickev.w + xvpermi.d + xvpickev.h + xvpermi.d
+    { ISD::TRUNCATE,    MVT::v16i1,  MVT::v16i64, {16, 8 } }, // 2 * (xvpickev.w + xvpermi.d) + xvpickev.h + xvpermi.d + xvpickev.b + xvpermi.d
+
+    { ISD::TRUNCATE,    MVT::v16i16, MVT::v16i32, { 4, 2 } }, // xvpickev.h + xvpermi.d
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v16i32, { 8, 4 } }, // xvpickev.h + xvpermi.d + xvpickev.b + xvpermi.d
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i16,  { 1, 1 } }, // xvpickev.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i32,  { 2, 2 } }, // xvpickev.h + xvpickev.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v2i64,  { 1, 1 } }, // vextrins.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v8i32,  { 5, 3 } }, // xvpickev.h + xvpermi.d + xvpickev.b
+    { ISD::TRUNCATE,    MVT::v16i8,  MVT::v4i64,  { 6, 4 } }, // xvpickev.w + xvpermi.d + xvpickev.h + xvpickev.b
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i32,  { 1, 1 } }, // xvpickev.h
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v2i64,  { 1, 1 } }, // vextrins.h
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v4i64,  { 5, 3 } }, // xvpickev.w + xvpermi.d + xvpickev.h
+    { ISD::TRUNCATE,    MVT::v4i32,  MVT::v4i64,  { 4, 2 } }, // xvpickev.w + xvpermi.d
+    { ISD::TRUNCATE,    MVT::v8i16,  MVT::v8i32,  { 4, 2 } }, // xvpickev.h + xvpermi.d
+
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v8f32,  { 9, 4 } }, // xvftintrz.w.s + xvpickev.h + xvpermi.d + xvpickev.b
+    { ISD::FP_TO_SINT,  MVT::v16i8,  MVT::v4f64,  {10, 5 } }, // xvftintrz.w.d + xvpermi.d + xvpickev.h + xvpickev.b
+    { ISD::FP_TO_SINT,  MVT::v32i8,  MVT::v8f32,  { 9, 4 } }, // xvftintrz.w.s + xvpickev.h + xvpermi.d + xvpickev.b
+    { ISD::FP_TO_SINT,  MVT::v32i8,  MVT::v4f64,  {10, 5 } }, // xvftintrz.w.d + xvpermi.d + xvpickev.h + xvpickev.b
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v8f32,  { 8, 3 } }, // xvftintrz.w.s + xvpickev.h + xvpermi.d
+    { ISD::FP_TO_SINT,  MVT::v8i16,  MVT::v4f64,  { 9, 4 } }, // xvftintrz.w.d + xvpermi.d + xvpickev.h
+    { ISD::FP_TO_SINT,  MVT::v16i16, MVT::v8f32,  { 8, 3 } }, // xvftintrz.w.s + xvpickev.h + xvpermi.d
+    { ISD::FP_TO_SINT,  MVT::v16i16, MVT::v4f64,  { 9, 4 } }, // xvftintrz.w.d + xvpermi.d + xvpickev.h
+    { ISD::FP_TO_SINT,  MVT::v4i32,  MVT::v4f64,  { 8, 3 } }, // xvftintrz.w.d + xvpermi.d
+    { ISD::FP_TO_SINT,  MVT::v8i32,  MVT::v8f32,  { 4, 1 } }, // xvftintrz.w.s
+    { ISD::FP_TO_SINT,  MVT::v8i32,  MVT::v8f64,  { 8, 3 } }, // xvftintrz.w.d + xvpermi.d
+
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v8f32,  { 9, 4 } }, // xvftintrz.wu.s + xvpickev.h + xvpermi.d + xvpickev.b
+    { ISD::FP_TO_UINT,  MVT::v16i8,  MVT::v4f64,  {10, 5 } }, // xvftintrz.l.d + xvpickev.w + xvpermi.d + xvpickev.h + xvpickev.b
+    { ISD::FP_TO_UINT,  MVT::v32i8,  MVT::v8f32,  { 9, 4 } }, // xvftintrz.wu.s + xvpickev.h + xvpermi.d + xvpickev.b
+    { ISD::FP_TO_UINT,  MVT::v32i8,  MVT::v4f64,  {10, 5 } }, // xvftintrz.l.d + xvpickev.w + xvpermi.d + xvpickev.h + xvpickev.b
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v8f32,  { 8, 3 } }, // xvftintrz.wu.s + xvpickev.h + xvpermi.d
+    { ISD::FP_TO_UINT,  MVT::v8i16,  MVT::v4f64,  { 9, 4 } }, // xvftintrz.l.d + xvpickev.w + xvpermi.d + xvpickev.h
+    { ISD::FP_TO_UINT,  MVT::v16i16, MVT::v8f32,  { 8, 3 } }, // xvftintrz.wu.s + xvpickev.h + xvpermi.d
+    { ISD::FP_TO_UINT,  MVT::v16i16, MVT::v4f64,  { 9, 4 } }, // xvftintrz.l.d + xvpickev.w + xvpermi.d + xvpickev.h
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f32,  { 4, 1 } }, // vftintrz.wu.s
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v2f64,  { 5, 2 } }, // vftintrz.l.d + vshuf4i.w
+    { ISD::FP_TO_UINT,  MVT::v4i32,  MVT::v4f64,  { 8, 3 } }, // xvftintrz.l.d + xvpickev.w + xvpermi.d
+    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v8f32,  { 4, 1 } }, // xvftintrz.wu.s
+    { ISD::FP_TO_UINT,  MVT::v8i32,  MVT::v4f64,  { 8, 3 } }, // xvftintrz.l.d + xvpickev.w + xvpermi.d
+    { ISD::FP_TO_UINT,  MVT::v4i64,  MVT::v4f64,  { 4, 1 } }, // xvftintrz.lu.d
+
+    { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v4i1,   { 6, 3 } }, // vslli.w + vsrai.w + vffint.s.w
+    { ISD::SINT_TO_FP,  MVT::v4f64,  MVT::v4i1,   { 9, 4 } }, // vext2xv.du.wu + xvslli.d + xvsrai.d + xvffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v8f32,  MVT::v8i1,   { 9, 4 } }, // vext2xv.wu.hu + xvslli.w + xvsrai.w + xvffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v8f32,  MVT::v16i8,  { 7, 2 } }, // vext2xv.w.b + xvffint.s.w
+    { ISD::SINT_TO_FP,  MVT::v4f64,  MVT::v16i8,  { 7, 2 } }, // vext2xv.d.b + xvffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v8f32,  MVT::v8i16,  { 7, 2 } }, // vext2xv.w.h + xvffint.s.w
+    { ISD::SINT_TO_FP,  MVT::v4f64,  MVT::v8i16,  { 7, 2 } }, // vext2xv.d.h + xvffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v4f64,  MVT::v4i32,  { 7, 2 } }, // vext2xv.d.w + xvffint.d.l
+    { ISD::SINT_TO_FP,  MVT::v8f32,  MVT::v8i32,  { 4, 1 } }, // xvffint.s.w
+    { ISD::SINT_TO_FP,  MVT::v8f64,  MVT::v8i32,  {18, 5 } }, // xvpermi.q + 2 * (vext2xv.d.w + xvffint.d.l)
+    { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v2i64,  { 5, 2 } }, // vffint.s.l
+    { ISD::SINT_TO_FP,  MVT::v4f32,  MVT::v4i64,  { 8, 3 } }, // xvffint.s.l + xvpermi.d
+
+    { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v4i1,   { 6, 3 } }, // vrepli.w + vand.v + vffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v4i1,   { 9, 4 } }, // vrepli.w + vand.v + vext2xv.du.wu + xvffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v8f32,  MVT::v8i1,   { 9, 4 } }, // vrepli.h + vand.v + vext2xv.wu.hu + xvffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v8f32,  MVT::v16i8,  { 7, 2 } }, // vext2xv.wu.bu + xvffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v16i8,  { 7, 2 } }, // vext2xv.du.bu + xvffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v8f32,  MVT::v8i16,  { 7, 2 } }, // vext2xv.wu.hu + xvffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v8i16,  { 7, 2 } }, // vext2xv.du.hu + xvffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v2f32,  MVT::v2i32,  { 4, 1 } }, // vffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v2i32,  { 7, 2 } }, // vext2xv.du.wu + vffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v4i32,  { 4, 1 } }, // vffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v4i32,  { 7, 2 } }, // vext2xv.du.wu + xvffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v8f32,  MVT::v8i32,  { 4, 1 } }, // xvffint.s.wu
+    { ISD::UINT_TO_FP,  MVT::v8f64,  MVT::v8i32,  {18, 5 } }, // xvpermi.q + 2 * (vext2xv.du.wu + xvffint.d.lu)
+    { ISD::UINT_TO_FP,  MVT::v2f32,  MVT::v2i64,  {10, 4 } }, // xvffint.d.lu + xvpermi.d + xvfcvt.s.d
+    { ISD::UINT_TO_FP,  MVT::v4f32,  MVT::v4i64,  {10, 4 } }, // xvffint.d.lu + xvpermi.d + xvfcvt.s.d
+    { ISD::UINT_TO_FP,  MVT::v2f64,  MVT::v2i64,  { 4, 1 } }, // vffint.d.lu
+    { ISD::UINT_TO_FP,  MVT::v4f64,  MVT::v4i64,  { 4, 1 } }, // xvffint.d.lu
   };
 
   static const TypeConversionCostKindTblEntry LSXConversionTbl[] = {

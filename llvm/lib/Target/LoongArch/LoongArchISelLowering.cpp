@@ -7773,7 +7773,7 @@ static SDValue performSINT_TO_FPCombine(SDNode *N, SelectionDAG &DAG,
     unsigned DstElts = VT.getVectorNumElements();
     unsigned SrcEltBits = SrcVT.getScalarSizeInBits();
     unsigned DstEltBits = VT.getScalarSizeInBits();
-    unsigned SrcBits = SrcVT.getScalarSizeInBits();
+    unsigned SrcBits = SrcVT.getSizeInBits();
 
     if (SrcEltBits >= DstEltBits) {
       // Use vffint.s.l for vector signed i64 convert to float
