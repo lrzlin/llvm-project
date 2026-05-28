@@ -7887,9 +7887,9 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
                                        TargetLowering::DAGCombinerInfo &DCI,
                                        const LoongArchSubtarget &Subtarget) {
   SDLoc DL(N);
-  MVT DstVT = N->getSimpleValueType(0);
+  EVT DstVT = N->getValueType(0);
   SDValue Src = N->getOperand(0);
-  MVT SrcVT = Src.getSimpleValueType();
+  EVT SrcVT = Src.getValueType();
   bool IsSigned = N->getOpcode() == ISD::FP_TO_SINT;
 
   if (!Subtarget.hasExtLSX())
@@ -7897,7 +7897,8 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
 
   if (!DstVT.isVector() && !SrcVT.isVector()) {
     // Use vftintrz.lu.d for unsigned convert if we have LSX support.
-    if (!IsSigned && DstVT == MVT::i64) {
+    if (!IsSigned && DstVT.getSimpleVT() == MVT::i64 &&
+        (SrcVT.getSimpleVT() == MVT::f32 || SrcVT.getSimpleVT() == MVT::f64)) {
       SDValue Ext = Src;
       if (SrcVT == MVT::f32)
         Ext = DAG.getNode(ISD::FP_EXTEND, DL, MVT::f64, Src);
@@ -7973,11 +7974,11 @@ static SDValue performTRUNCATECombine(SDNode *N, SelectionDAG &DAG,
                                       TargetLowering::DAGCombinerInfo &DCI,
                                       const LoongArchSubtarget &Subtarget) {
   SDLoc DL(N);
-  MVT VT = N->getSimpleValueType(0);
   SDValue Src = N->getOperand(0);
-  MVT SrcVT = Src.getSimpleValueType();
+  EVT VT = N->getSimpleValueType(0);
+  EVT SrcVT = Src.getSimpleValueType();
 
-  if (!VT.isVector())
+  if (!VT.isVector() || !VT.isSimple() || !SrcVT.isSimple())
     return SDValue();
 
   unsigned NumElts = VT.getVectorNumElements();
@@ -7988,6 +7989,9 @@ static SDValue performTRUNCATECombine(SDNode *N, SelectionDAG &DAG,
   unsigned BlockBits = Subtarget.hasExtLASX() ? 256 : 128;
 
   if (SrcBits < 128 || NumElts < 4 || DstBits > BlockBits || !isPowerOf2_32(NumElts))
+    return SDValue();
+
+  if (!isPowerOf2_32(DstEltBits) || DstEltBits < 8 || DstEltBits > 64)
     return SDValue();
 
   SmallVector<SDValue, 8> Blocks;
@@ -8005,7 +8009,7 @@ static SDValue performTRUNCATECombine(SDNode *N, SelectionDAG &DAG,
   } else if (SrcBits < BlockBits) {
     // Extend Src to BlockBits (256-bit)
     MVT WidenVT =
-        MVT::getVectorVT(SrcVT.getScalarType(), BlockBits / SrcEltBits);
+        MVT::getVectorVT(MVT::getIntegerVT(SrcVT.getScalarSizeInBits()), BlockBits / SrcEltBits);
     Blocks.push_back(
         DAG.getNode(ISD::INSERT_SUBVECTOR, DL, WidenVT, DAG.getUNDEF(WidenVT),
                     Src, DAG.getConstant(0, DL, Subtarget.getGRLenVT())));
