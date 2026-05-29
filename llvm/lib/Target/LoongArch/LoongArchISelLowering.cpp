@@ -599,6 +599,8 @@ SDValue LoongArchTargetLowering::LowerOperation(SDValue Op,
     return lowerConstantPool(Op, DAG);
   case ISD::FP_TO_SINT:
     return lowerFP_TO_SINT(Op, DAG);
+  case ISD::FP_TO_UINT:
+    return lowerFP_TO_UINT(Op, DAG);
   case ISD::BITCAST:
     return lowerBITCAST(Op, DAG);
   case ISD::UINT_TO_FP:
@@ -4111,11 +4113,21 @@ SDValue LoongArchTargetLowering::lowerVASTART(SDValue Op,
 
 SDValue LoongArchTargetLowering::lowerUINT_TO_FP(SDValue Op,
                                                  SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  SDValue Op0 = Op.getOperand(0);
+  EVT VT = Op.getValueType();
+  EVT Op0VT = Op0.getValueType();
+
+  if (Subtarget.hasExtLSX() && Op0VT == MVT::i64 && VT == MVT::f64) {
+    Op0 = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v2i64, Op0);
+    SDValue Conv = DAG.getNode(ISD::UINT_TO_FP, DL, MVT::v2f64, Op0);
+    return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, VT, Conv,
+                       DAG.getIntPtrConstant(0, DL));
+  }
+
   assert(Subtarget.is64Bit() && Subtarget.hasBasicF() &&
          !Subtarget.hasBasicD() && "unexpected target features");
 
-  SDLoc DL(Op);
-  SDValue Op0 = Op.getOperand(0);
   if (Op0->getOpcode() == ISD::AND) {
     auto *C = dyn_cast<ConstantSDNode>(Op0.getOperand(1));
     if (C && C->getZExtValue() < UINT64_C(0xFFFFFFFF))
@@ -4207,6 +4219,27 @@ SDValue LoongArchTargetLowering::lowerFP_TO_SINT(SDValue Op,
   EVT FPTy = EVT::getFloatingPointVT(Op.getValueSizeInBits());
   SDValue Trunc = DAG.getNode(LoongArchISD::FTINT, DL, FPTy, Op0);
   return DAG.getNode(ISD::BITCAST, DL, Op.getValueType(), Trunc);
+}
+
+SDValue LoongArchTargetLowering::lowerFP_TO_UINT(SDValue Op,
+                                                 SelectionDAG &DAG) const {
+  if (!Subtarget.hasExtLSX())
+    return SDValue();
+
+  SDLoc DL(Op);
+  SDValue Src = Op.getOperand(0);
+  EVT VT = Op.getValueType();
+  EVT SrcVT = Src.getValueType();
+  if (VT == MVT::i64 && (SrcVT == MVT::f32 || SrcVT == MVT::f64)) {
+    if (SrcVT == MVT::f32)
+      Src = DAG.getNode(ISD::FP_EXTEND, DL, MVT::f64, Src);
+    Src = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v2f64, Src);
+    SDValue Conv = DAG.getNode(ISD::FP_TO_UINT, DL, MVT::v2i64, Src);
+    return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, VT, Conv,
+                       DAG.getIntPtrConstant(0, DL));
+  }
+
+  return SDValue();
 }
 
 static SDValue getTargetNode(GlobalAddressSDNode *N, SDLoc DL, EVT Ty,
@@ -5515,6 +5548,7 @@ void LoongArchTargetLowering::ReplaceNodeResults(
   case ISD::FP_TO_UINT: {
     assert(VT == MVT::i32 && Subtarget.is64Bit() &&
            "Unexpected custom legalisation");
+
     auto &TLI = DAG.getTargetLoweringInfo();
     SDValue Tmp1, Tmp2;
     TLI.expandFP_TO_UINT(N, Tmp1, Tmp2, DAG);
@@ -7897,6 +7931,7 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
 
   if (!DstVT.isVector() && !SrcVT.isVector()) {
     // Use vftintrz.lu.d for unsigned convert if we have LSX support.
+    /*
     if (!IsSigned && DstVT.getSimpleVT() == MVT::i64 &&
         (SrcVT.getSimpleVT() == MVT::f32 || SrcVT.getSimpleVT() == MVT::f64)) {
       SDValue Ext = Src;
@@ -7907,6 +7942,7 @@ static SDValue performFP_TO_INTCombine(SDNode *N, SelectionDAG &DAG,
       return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, DstVT, Conv,
                          DAG.getIntPtrConstant(0, DL));
     }
+    */
     return SDValue();
   }
 
