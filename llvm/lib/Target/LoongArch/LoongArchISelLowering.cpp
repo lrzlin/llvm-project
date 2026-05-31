@@ -163,7 +163,7 @@ LoongArchTargetLowering::LoongArchTargetLowering(const TargetMachine &TM,
   setOperationAction({ISD::SMUL_LOHI, ISD::UMUL_LOHI}, GRLenVT, Expand);
 
   setOperationAction(ISD::FP_TO_UINT, GRLenVT, Custom);
-  setOperationAction(ISD::UINT_TO_FP, GRLenVT, Expand);
+  setOperationAction(ISD::UINT_TO_FP, GRLenVT, Custom);
 
   // Set operations for LA64 only.
 
@@ -4118,11 +4118,17 @@ SDValue LoongArchTargetLowering::lowerUINT_TO_FP(SDValue Op,
   EVT VT = Op.getValueType();
   EVT Op0VT = Op0.getValueType();
 
-  if (Subtarget.hasExtLSX() && Op0VT == MVT::i64 && VT == MVT::f64) {
-    Op0 = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v2i64, Op0);
-    SDValue Conv = DAG.getNode(ISD::UINT_TO_FP, DL, MVT::v2f64, Op0);
-    return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, VT, Conv,
-                       DAG.getIntPtrConstant(0, DL));
+  if (Subtarget.is64Bit() && Subtarget.hasBasicD()) {
+    if (DAG.SignBitIsZero(Op0))
+      return DAG.getNode(ISD::SINT_TO_FP, DL, VT, Op0);
+
+    if (Subtarget.hasExtLSX() && Op0VT == MVT::i64 && VT == MVT::f64) {
+      Op0 = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v2i64, Op0);
+      SDValue Conv = DAG.getNode(ISD::UINT_TO_FP, DL, MVT::v2f64, Op0);
+      return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, VT, Conv,
+                        DAG.getIntPtrConstant(0, DL));
+    }
+    return SDValue();
   }
 
   assert(Subtarget.is64Bit() && Subtarget.hasBasicF() &&
