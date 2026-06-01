@@ -4119,14 +4119,19 @@ SDValue LoongArchTargetLowering::lowerUINT_TO_FP(SDValue Op,
   EVT Op0VT = Op0.getValueType();
 
   if (Subtarget.is64Bit() && Subtarget.hasBasicD()) {
-    if (DAG.SignBitIsZero(Op0))
+    if (DAG.SignBitIsZero(Op0) &&
+        isOperationLegalOrCustom(ISD::SINT_TO_FP, Op0VT))
       return DAG.getNode(ISD::SINT_TO_FP, DL, VT, Op0);
 
-    if (Subtarget.hasExtLSX() && Op0VT == MVT::i64 && VT == MVT::f64) {
+    if (Subtarget.hasExtLSX() && Op0VT == MVT::i64 &&
+        (VT == MVT::f32 || VT == MVT::f64)) {
       Op0 = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v2i64, Op0);
       SDValue Conv = DAG.getNode(ISD::UINT_TO_FP, DL, MVT::v2f64, Op0);
-      return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, VT, Conv,
+      Conv = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::f64, Conv,
                         DAG.getIntPtrConstant(0, DL));
+      if (VT == MVT::f32)
+        Conv = DAG.getFPExtendOrRound(Conv, DL, VT);
+      return Conv;
     }
     return SDValue();
   }
