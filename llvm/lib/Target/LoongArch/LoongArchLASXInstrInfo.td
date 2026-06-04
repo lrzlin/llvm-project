@@ -2139,6 +2139,10 @@ def : Pat<(v16i16 (concat_vectors (v8i16 (trunc v8i32:$xj)), (v8i16 (trunc v8i32
 def : Pat<(v32i8 (concat_vectors (v16i8 (trunc v16i16:$xj)), (v16i8 (trunc v16i16:$xk)))),
           (XVPERMI_D(XVPICKEV_B v16i16:$xk, v16i16:$xj), 216)>;
 
+// XVFTINTRZ_W_D
+def : Pat<(v8i32 (loongarch_vftintrz_w_d (v4f64 LASX256:$xj), (v4f64 LASX256:$xk))),
+          (XVFTINTRZ_W_D LASX256:$xj, LASX256:$xk)>;
+
 // XVAVG_{B/H/W/D/BU/HU/WU/DU}, XVAVGR_{B/H/W/D/BU/HU/WU/DU}
 defm : PatXrXr<avgfloors, "XVAVG">;
 defm : PatXrXr<avgceils, "XVAVGR">;
