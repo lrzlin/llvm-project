@@ -155,12 +155,19 @@ def TunePreferWInst
                        "Prefer instructions with W suffix">;
 
 //===----------------------------------------------------------------------===//
-// Registers, instruction descriptions ...
+// Schedule, Registers, instruction descriptions ...
 //===----------------------------------------------------------------------===//
 
+include "LoongArchSchedule.td"
 include "LoongArchRegisterInfo.td"
 include "LoongArchCallingConv.td"
 include "LoongArchInstrInfo.td"
+
+//===----------------------------------------------------------------------===//
+// LoongArch Scheduling Models.
+//===----------------------------------------------------------------------===//
+
+include "LoongArchSchedLA664.td"
 
 //===----------------------------------------------------------------------===//
 // LoongArch processors supported.
@@ -189,7 +196,7 @@ def : ProcessorModel<"la464", NoSchedModel, [Feature64Bit,
                                              FeatureExtLVZ,
                                              FeatureExtLBT]>;
 
-def : ProcessorModel<"la664", NoSchedModel, [Feature64Bit,
+def : ProcessorModel<"la664", LA664Model, [Feature64Bit,
                                              FeatureUAL,
                                              FeatureExtLASX,
                                              FeatureExtLVZ,
