@@ -61,7 +61,7 @@ def FSUB_S : FP_ALU_3R<0x01028000>,
 def FMUL_S : FP_ALU_3R<0x01048000>,
              Sched<[WriteFMUL, ReadFMUL, ReadFMUL]>;
 def FDIV_S : FP_ALU_3R<0x01068000>,
-             Sched<[WriteFDIV, ReadFDIV, ReadFDIV]>;
+             Sched<[WriteFDIV32, ReadFDIV32, ReadFDIV32]>;
 def FMADD_S  : FP_ALU_4R<0x08100000>,
                Sched<[WriteFMADD, ReadFMADD, ReadFMADD, ReadFMADD]>;
 def FMSUB_S  : FP_ALU_4R<0x08500000>,

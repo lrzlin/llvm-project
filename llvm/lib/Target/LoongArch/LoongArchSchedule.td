@@ -209,7 +209,8 @@ def WriteFDIV32       : SchedWrite; // 32-bit floating-point divide on LA64
 def ReadFDIV          : SchedRead;  // floating-point divide
 def ReadFDIV32        : SchedRead;  // 32-bit floating-point divide on LA64
 //===----------------------------------------------------------------------===//
-// FDIV.S  FDIV.D     Sched<[WriteFDIV, ReadFDIV, ReadFDIV]>
+// FDIV.S             Sched<[WriteFDIV32, ReadFDIV32, ReadFDIV32]>
+// FDIV.D             Sched<[WriteFDIV, ReadFDIV, ReadFDIV]>
 //===----------------------------------------------------------------------===//
 
 def WriteFMADD        : SchedWrite; // floating-point fused multiply-add
