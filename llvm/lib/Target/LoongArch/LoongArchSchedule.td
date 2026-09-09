@@ -516,4 +516,4 @@ def WriteOthers       : SchedWrite; // Others write operations
 def ReadOthers        : SchedRead;  // Others read  operations
 
 // Include the scheduler resources for other instruction extensions.
-// include "LoongArchScheduleV.td"
+include "LoongArchScheduleV.td"
