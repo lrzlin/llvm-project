@@ -21,6 +21,12 @@ namespace llvm {
   class X86Subtarget;
   class X86TargetMachine;
 
+  /// The smallest page size supported by any X86 OS we care about. A naturally
+  /// aligned access of at most this many bytes cannot cross a page boundary,
+  /// which makes it safe to speculate. Used by @llvm.can.load.speculatively
+  /// and its cost model.
+  static constexpr uint64_t X86MinPageSize = 4096;
+
   namespace X86ISD {
     // X86 Specific DAG Nodes
   enum NodeType : unsigned {
@@ -1884,6 +1890,9 @@ namespace llvm {
     shouldExpandLogicAtomicRMWInIR(const AtomicRMWInst *AI) const;
     void emitBitTestAtomicRMWIntrinsic(AtomicRMWInst *AI) const override;
     void emitCmpArithAtomicRMWIntrinsic(AtomicRMWInst *AI) const override;
+
+    Value *emitCanLoadSpeculatively(IRBuilderBase &Builder, Value *Ptr,
+                                    Value *Size) const override;
 
     LoadInst *
     lowerIdempotentRMWIntoFencedLoad(AtomicRMWInst *AI) const override;

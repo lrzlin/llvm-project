@@ -22,6 +22,13 @@
 namespace llvm {
 class LoongArchSubtarget;
 
+/// The smallest page size LoongArch Linux is configured with. A naturally
+/// aligned access of at most this many bytes cannot cross a page boundary,
+/// which makes it safe to speculate. LoongArch also supports 16K and 64K
+/// pages; using the smallest value stays correct for all of them. Used by
+/// @llvm.can.load.speculatively and its cost model.
+static constexpr uint64_t LoongArchMinPageSize = 4096;
+
 class LoongArchTargetLowering : public TargetLowering {
   const LoongArchSubtarget &Subtarget;
 
@@ -62,6 +69,9 @@ public:
   TargetLowering::AtomicExpansionKind
   shouldExpandAtomicRMWInIR(const AtomicRMWInst *AI) const override;
   void emitExpandAtomicRMW(AtomicRMWInst *AI) const override;
+
+  Value *emitCanLoadSpeculatively(IRBuilderBase &Builder, Value *Ptr,
+                                  Value *Size) const override;
 
   Value *emitMaskedAtomicRMWIntrinsic(IRBuilderBase &Builder, AtomicRMWInst *AI,
                                       Value *AlignedAddr, Value *Incr,

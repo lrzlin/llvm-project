@@ -133,3 +133,30 @@ LoongArchTTIImpl::enableMemCmpExpansion(bool OptSize, bool IsZeroCmp) const {
 
   return Options;
 }
+
+InstructionCost
+LoongArchTTIImpl::getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
+                                        TTI::TargetCostKind CostKind) const {
+  if (ICA.getID() == Intrinsic::speculative_load) {
+    Type *RetTy = ICA.getReturnType();
+    // LoongArch has no scalable vectors and no memory tagging. A speculative
+    // load is safe as long as the check emitted by emitCanLoadSpeculatively
+    // can prove it stays inside one page, which requires a power-of-two size
+    // no larger than the minimum page size.
+    if (isa<ScalableVectorType>(RetTy))
+      return InstructionCost::getInvalid();
+    if (RetTy->isVectorTy() && !ST->hasExtLSX())
+      return InstructionCost::getInvalid();
+    TypeSize Size = DL.getTypeStoreSize(RetTy);
+    if (Size.isScalable() || !isPowerOf2_64(Size.getFixedValue()) ||
+        Size.getFixedValue() > LoongArchMinPageSize)
+      return InstructionCost::getInvalid();
+    std::pair<InstructionCost, MVT> LT = getTypeLegalizationCost(RetTy);
+    if (!LT.first.isValid())
+      return InstructionCost::getInvalid();
+    // Costs the same as a regular load; alignment is guaranteed by the check.
+    return getMemoryOpCost(Instruction::Load, RetTy, Align(1), 0, CostKind);
+  }
+
+  return BaseT::getIntrinsicInstrCost(ICA, CostKind);
+}

@@ -9027,6 +9027,48 @@ EVT LoongArchTargetLowering::getSetCCResultType(const DataLayout &DL,
   return VT.changeVectorElementTypeToInteger();
 }
 
+Value *LoongArchTargetLowering::emitCanLoadSpeculatively(IRBuilderBase &Builder,
+                                                         Value *Ptr,
+                                                         Value *Size) const {
+  unsigned AS = cast<PointerType>(Ptr->getType())->getAddressSpace();
+  // Conservatively only allow speculation for the default address space.
+  if (AS != 0)
+    return nullptr;
+
+  // Emit an alignment check: (ptr & (size - 1)) == 0. If the pointer is
+  // aligned to at least 'size' bytes and 'size' is a power of two no larger
+  // than the smallest page, the load lies entirely within one page and so
+  // cannot fault beyond the first byte. LoongArch has no memory tagging, so
+  // the page size is the only limit.
+  const DataLayout &DL = Builder.GetInsertBlock()->getDataLayout();
+  unsigned PtrBits = DL.getPointerSizeInBits(AS);
+  Type *IntPtrTy = Builder.getIntNTy(PtrBits);
+
+  if (auto *CI = dyn_cast<ConstantInt>(Size)) {
+    uint64_t SizeVal = CI->getZExtValue();
+    assert(isPowerOf2_64(SizeVal) && "size must be power-of-two");
+    if (SizeVal > LoongArchMinPageSize)
+      return nullptr;
+
+    Value *PtrInt = Builder.CreatePtrToInt(Ptr, IntPtrTy);
+    Value *Masked =
+        Builder.CreateAnd(PtrInt, ConstantInt::get(IntPtrTy, SizeVal - 1));
+    return Builder.CreateICmpEQ(Masked, ConstantInt::get(IntPtrTy, 0));
+  }
+
+  // Non-constant size: check size <= page size and the alignment.
+  Value *PtrInt = Builder.CreatePtrToInt(Ptr, IntPtrTy);
+  Value *SizeExt = Builder.CreateZExtOrTrunc(Size, IntPtrTy);
+  Value *SizeInRange = Builder.CreateICmpULE(
+      SizeExt, ConstantInt::get(IntPtrTy, LoongArchMinPageSize));
+  Value *SizeMinusOne =
+      Builder.CreateSub(SizeExt, ConstantInt::get(IntPtrTy, 1));
+  Value *Masked = Builder.CreateAnd(PtrInt, SizeMinusOne);
+  Value *AlignCheck =
+      Builder.CreateICmpEQ(Masked, ConstantInt::get(IntPtrTy, 0));
+  return Builder.CreateAnd(SizeInRange, AlignCheck);
+}
+
 bool LoongArchTargetLowering::hasAndNot(SDValue Y) const {
   EVT VT = Y.getValueType();
 

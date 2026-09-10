@@ -55,6 +55,10 @@ public:
 
   bool shouldExpandReduction(const IntrinsicInst *II) const override;
 
+  InstructionCost
+  getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
+                        TTI::TargetCostKind CostKind) const override;
+
   TTI::MemCmpExpansionOptions
   enableMemCmpExpansion(bool OptSize, bool IsZeroCmp) const override;
 };
