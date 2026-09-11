@@ -205,6 +205,42 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<const SCEV *> Ops) {
       return SE.getUDivExpr(Ops[0], Ops[1]);
     });
+  // shl X, C is X * 2^C; in modular arithmetic this holds exactly, so no
+  // no-wrap flags are needed.
+  const APInt *ShlAmt, *AShrAmt;
+  if (match(V, m_Binary<Instruction::Shl>(m_VPValue(LHSVal), m_APInt(ShlAmt)))) {
+    const VPlan *Plan = V->getDefiningRecipe()->getParent()->getPlan();
+    Type *Ty = VPTypeAnalysis(*Plan).inferScalarType(V);
+    unsigned BW = Ty->getScalarSizeInBits();
+    // A shift >= bitwidth is undefined; leave it alone.
+    if (ShlAmt->ult(BW))
+      return CreateSCEV({LHSVal}, [&](ArrayRef<const SCEV *> Ops) {
+        return SE.getMulExpr(
+            Ops[0],
+            SE.getConstant(APInt::getOneBitSet(BW, ShlAmt->getZExtValue())),
+            SCEV::FlagAnyWrap);
+      });
+  }
+  // ashr (shl X, C), C is the canonical spelling of a sign extension from the
+  // low BW-C bits. Model it as sext(trunc(X)), matching what
+  // ScalarEvolution::createSCEV does for the same IR pattern.
+  if (match(V, m_Binary<Instruction::AShr>(
+                   m_Binary<Instruction::Shl>(m_VPValue(LHSVal),
+                                              m_APInt(ShlAmt)),
+                   m_APInt(AShrAmt))) &&
+      *ShlAmt == *AShrAmt && !ShlAmt->isZero()) {
+    const VPlan *Plan = V->getDefiningRecipe()->getParent()->getPlan();
+    Type *DestTy = VPTypeAnalysis(*Plan).inferScalarType(V);
+    unsigned BW = DestTy->getScalarSizeInBits();
+    if (ShlAmt->ult(BW)) {
+      Type *TruncTy = IntegerType::get(DestTy->getContext(),
+                                       BW - ShlAmt->getZExtValue());
+      return CreateSCEV({LHSVal}, [&](ArrayRef<const SCEV *> Ops) {
+        return SE.getSignExtendExpr(SE.getTruncateExpr(Ops[0], TruncTy),
+                                    DestTy);
+      });
+    }
+  }
   // Handle AND with constant mask: x & (2^n - 1) can be represented as x % 2^n.
   const APInt *Mask;
   if (match(V, m_c_BinaryAnd(m_VPValue(LHSVal), m_APInt(Mask))) &&
