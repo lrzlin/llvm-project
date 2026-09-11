@@ -174,6 +174,14 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   // Broadcast just replicates a scalar, so the SCEV is the same as its operand.
   if (match(V, m_Broadcast(m_VPValue(LHSVal))))
     return getSCEVExprForVPValue(LHSVal, PSE, L);
+  // Unpack and an extract of lane 0 both re-expose the scalar behind a widened
+  // value without changing its address expression, so they have the same SCEV
+  // as their source (which, as for the widened recipes below, is lane 0's).
+  if (match(V, m_VPInstruction<VPInstruction::Unpack>(m_VPValue(LHSVal))))
+    return getSCEVExprForVPValue(LHSVal, PSE, L);
+  if (match(V, m_VPInstruction<Instruction::ExtractElement>(
+                   m_VPValue(LHSVal), m_SpecificInt(0))))
+    return getSCEVExprForVPValue(LHSVal, PSE, L);
   if (match(V, m_Add(m_VPValue(LHSVal), m_VPValue(RHSVal))))
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<const SCEV *> Ops) {
       return SE.getAddExpr(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
