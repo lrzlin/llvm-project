@@ -6324,6 +6324,64 @@ performINTRINSIC_WO_CHAINCombine(SDNode *N, SelectionDAG &DAG,
   switch (N->getConstantOperandVal(0)) {
   default:
     break;
+  case Intrinsic::experimental_cttz_elts: {
+    // Find the first set lane by turning the lane mask into a scalar bitmask
+    // and counting its trailing zeros, instead of the generic
+    // step-vector/AND/UMAX expansion. This has to happen before type
+    // legalization, which cannot promote the <N x i1> operand of an intrinsic.
+    if (!DCI.isBeforeLegalizeOps())
+      break;
+
+    MVT GRLenVT = Subtarget.getGRLenVT();
+    SDValue Src = N->getOperand(1);
+    EVT SrcVT = Src.getValueType();
+    if (!SrcVT.isVector() || SrcVT.isScalableVector())
+      break;
+    unsigned NumElts = SrcVT.getVectorNumElements();
+
+    // [X]VMSKLTZ reads lane sign bits, so a one-bit-per-lane mask first has to
+    // be widened back to the register layout it was compared in.
+    if (SrcVT.getVectorElementType() == MVT::i1) {
+      EVT WideVT;
+      if (Src.getOpcode() == ISD::SETCC)
+        WideVT =
+            Src.getOperand(0).getValueType().changeVectorElementTypeToInteger();
+      else
+        WideVT = EVT::getVectorVT(
+            *DAG.getContext(),
+            MVT::getIntegerVT(Subtarget.hasExtLASX() ? 256 / NumElts
+                                                     : 128 / NumElts),
+            NumElts);
+      if (!WideVT.isSimple())
+        break;
+      SrcVT = WideVT;
+      Src = DAG.getNode(ISD::SIGN_EXTEND, DL, SrcVT, Src);
+    }
+
+    unsigned SrcBits = SrcVT.getSizeInBits();
+    if (SrcBits != 128 && SrcBits != 256)
+      break;
+    if (SrcBits == 256 ? !Subtarget.hasExtLASX() : !Subtarget.hasExtLSX())
+      break;
+
+    SDValue Bits = DAG.getNode(SrcBits == 256 ? LoongArchISD::XVMSKLTZ
+                                              : LoongArchISD::VMSKLTZ,
+                               DL, GRLenVT, Src);
+
+    // Without zero_is_poison the result must be the vector length when no lane
+    // is set. Setting bit NumElts arranges exactly that, and can never hide a
+    // lower set bit. The bit has to fit in a GPR for that to work.
+    if (N->getConstantOperandVal(2) == 0) {
+      if (NumElts >= GRLenVT.getSizeInBits())
+        break;
+      Bits = DAG.getNode(ISD::OR, DL, GRLenVT, Bits,
+                         DAG.getConstant(1ULL << NumElts, DL, GRLenVT));
+    }
+
+    return DAG.getZExtOrTrunc(
+        DAG.getNode(ISD::CTTZ_ZERO_UNDEF, DL, GRLenVT, Bits), DL,
+        N->getValueType(0));
+  }
   case Intrinsic::loongarch_lsx_vadd_b:
   case Intrinsic::loongarch_lsx_vadd_h:
   case Intrinsic::loongarch_lsx_vadd_w:
@@ -9081,6 +9139,17 @@ EVT LoongArchTargetLowering::getSetCCResultType(const DataLayout &DL,
   if (!VT.isVector())
     return getPointerTy(DL);
   return VT.changeVectorElementTypeToInteger();
+}
+
+bool LoongArchTargetLowering::shouldExpandCttzElements(EVT VT) const {
+  // Handled above by a mask plus CTZ, but only for masks that correspond to a
+  // single LSX or LASX register.
+  if (!VT.isVector() || VT.isScalableVector())
+    return true;
+  unsigned NumElts = VT.getVectorNumElements();
+  if (!isPowerOf2_32(NumElts) || NumElts < 2 || NumElts > 32)
+    return true;
+  return Subtarget.hasExtLASX() ? false : !Subtarget.hasExtLSX() || NumElts > 16;
 }
 
 Value *LoongArchTargetLowering::emitCanLoadSpeculatively(IRBuilderBase &Builder,

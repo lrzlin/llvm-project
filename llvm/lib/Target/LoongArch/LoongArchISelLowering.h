@@ -70,6 +70,8 @@ public:
   shouldExpandAtomicRMWInIR(const AtomicRMWInst *AI) const override;
   void emitExpandAtomicRMW(AtomicRMWInst *AI) const override;
 
+  bool shouldExpandCttzElements(EVT VT) const override;
+
   Value *emitCanLoadSpeculatively(IRBuilderBase &Builder, Value *Ptr,
                                   Value *Size) const override;
 
