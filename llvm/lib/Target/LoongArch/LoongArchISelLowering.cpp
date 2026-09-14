@@ -5914,10 +5914,55 @@ static bool checkValueWidth(SDValue V, ISD::LoadExtType &ExtType) {
 //                               +-------------+
 //                               |     CMP     |
 //                               +-------------+
+/// Fold a lane-mask extraction that is only compared against zero into one of
+/// the whole-vector test instructions, which write their answer straight into a
+/// condition flag register:
+///
+///   (VMSKLTZ X) != 0  ->  VANYNONZERO X   (v/xvsetnez.v)
+///   (VMSKLTZ X) == 0  ->  VALLZERO    X   (v/xvseteqz.v)
+///
+/// This saves the mask materialization and its transfer to a GPR, and on LASX
+/// also the second half-extract plus the merge of the two halves.
+///
+/// VMSKLTZ only reports the sign bit of each lane, whereas the whole-vector
+/// tests look at every bit, so this is only valid when each lane of X is known
+/// to be all-ones or all-zeros. Otherwise a lane holding a nonzero positive
+/// value would be invisible to VMSKLTZ but seen by the vector test.
+static SDValue foldVMskZeroTest(SDValue LHS, SDValue RHS, ISD::CondCode CC,
+                                const SDLoc &DL, SelectionDAG &DAG,
+                                const LoongArchSubtarget &Subtarget) {
+  if (CC != ISD::SETEQ && CC != ISD::SETNE)
+    return SDValue();
+  if (!isNullConstant(RHS))
+    return SDValue();
+
+  unsigned MskOpc = LHS.getOpcode();
+  if (MskOpc != LoongArchISD::VMSKLTZ && MskOpc != LoongArchISD::XVMSKLTZ)
+    return SDValue();
+  // Keeping the mask alive for another user would defeat the purpose.
+  if (!LHS.hasOneUse())
+    return SDValue();
+
+  SDValue Src = LHS.getOperand(0);
+  EVT SrcVT = Src.getValueType();
+  if (!SrcVT.isVector() ||
+      DAG.ComputeNumSignBits(Src) != SrcVT.getScalarSizeInBits())
+    return SDValue();
+
+  return DAG.getNode(CC == ISD::SETNE ? LoongArchISD::VANYNONZERO
+                                      : LoongArchISD::VALLZERO,
+                     DL, Subtarget.getGRLenVT(), Src);
+}
+
 static SDValue performSETCCCombine(SDNode *N, SelectionDAG &DAG,
                                    TargetLowering::DAGCombinerInfo &DCI,
                                    const LoongArchSubtarget &Subtarget) {
   ISD::CondCode CC = cast<CondCodeSDNode>(N->getOperand(2))->get();
+
+  if (N->getValueType(0) == Subtarget.getGRLenVT())
+    if (SDValue V = foldVMskZeroTest(N->getOperand(0), N->getOperand(1), CC,
+                                     SDLoc(N), DAG, Subtarget))
+      return V;
 
   SDNode *AndNode = N->getOperand(0).getNode();
   if (AndNode->getOpcode() != ISD::AND)
@@ -6077,6 +6122,17 @@ static SDValue performBR_CCCombine(SDNode *N, SelectionDAG &DAG,
   SDValue RHS = N->getOperand(2);
   SDValue CC = N->getOperand(3);
   SDLoc DL(N);
+
+  // The branch reaches us as BR_CC because lowerBRCOND folds the integer
+  // SETCC in, so the vector test has to be recovered here rather than by
+  // performSETCCCombine. Both new nodes yield 0/1, hence the SETNE against
+  // zero regardless of the original condition.
+  if (SDValue V = foldVMskZeroTest(LHS, RHS, cast<CondCodeSDNode>(CC)->get(),
+                                   DL, DAG, Subtarget))
+    return DAG.getNode(LoongArchISD::BR_CC, DL, N->getValueType(0),
+                       N->getOperand(0), V,
+                       DAG.getConstant(0, DL, Subtarget.getGRLenVT()),
+                       DAG.getCondCode(ISD::SETNE), N->getOperand(4));
 
   if (combine_CC(LHS, RHS, CC, DL, DAG, Subtarget))
     return DAG.getNode(LoongArchISD::BR_CC, DL, N->getValueType(0),
