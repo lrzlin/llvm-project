@@ -22,7 +22,6 @@ def LA664Model : SchedMachineModel {
   let MicroOpBufferSize = 256;    // Reorder Buffer size
   let LoadLatency = 4;
   let MispredictPenalty = 14;     // Estimated value
-  let PostRAScheduler = true;
   let CompleteModel = 0;
 }
 
