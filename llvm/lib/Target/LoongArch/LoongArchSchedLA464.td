@@ -192,12 +192,11 @@ def : WriteRes<WriteIEXT, [LA464ALU]>;
 def : ReadAdvance<ReadIEXT, 0>;
 
 // Integer instruction latency CLO / CLZ / CTO / CTZ
-let Latency = 1 in {
-  def : WriteRes<WriteICL, [LA464ALU]>;
-  def : WriteRes<WriteICL32, [LA464ALU]>;
-  def : WriteRes<WriteICT, [LA464ALU]>;
-  def : WriteRes<WriteICT32, [LA464ALU]>;
-}
+def : WriteRes<WriteICL, [LA464ALU]>;
+def : WriteRes<WriteICL32, [LA464ALU]>;
+def : WriteRes<WriteICT, [LA464ALU]>;
+def : WriteRes<WriteICT32, [LA464ALU]>;
+
 def : ReadAdvance<ReadICL, 0>;
 def : ReadAdvance<ReadICL32, 0>;
 def : ReadAdvance<ReadICT, 0>;
@@ -503,32 +502,31 @@ def : ReadAdvance<ReadFRECIPE, 0>;
 def : ReadAdvance<ReadFRSQRTE, 0>;
 
 // Integer instruction latency PCADD
-let Latency = 1 in {
-  def : WriteRes<WriteIPCAdd, [LA464LoadAGU]>;
-}
+def : WriteRes<WriteIPCAdd, [LA464LoadAGU]>;
+
 def : ReadAdvance<ReadIPCAdd, 0>;
 
 //===----------------------------------------------------------------------===//
 
 // Vector instruction - LSX / LASX
 //
-// Vector integer arithmetic
-let Latency = 1 in {
-  def : WriteRes<WriteVALU128, [LA464FPU]>;
-  def : WriteRes<WriteVALU256, [LA464FPU]>;
-}
+// Vector integer arithmetic, default latency is 1.
+def : WriteRes<WriteVALU128, [LA464FPU]>;
+def : WriteRes<WriteVALU256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVALU128, 0>;
 def : ReadAdvance<ReadVALU256, 0>;
+
 let Latency = 3 in {
   def : WriteRes<WriteVALUQ128, [LA464VMul]>;
   def : WriteRes<WriteVALUQ256, [LA464VMul]>;
 }
 def : ReadAdvance<ReadVALUQ128, 0>;
 def : ReadAdvance<ReadVALUQ256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVAVG128, [LA464FPU]>;
-  def : WriteRes<WriteVAVG256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVAVG128, [LA464FPU]>;
+def : WriteRes<WriteVAVG256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVAVG128, 0>;
 def : ReadAdvance<ReadVAVG256, 0>;
 let Latency = 2 in {
@@ -573,10 +571,10 @@ let Latency = 3 in {
 }
 def : ReadAdvance<ReadVWADDQ128, 0>;
 def : ReadAdvance<ReadVWADDQ256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVMINMAX128, [LA464FPU]>;
-  def : WriteRes<WriteVMINMAX256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVMINMAX128, [LA464FPU]>;
+def : WriteRes<WriteVMINMAX256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVMINMAX128, 0>;
 def : ReadAdvance<ReadVMINMAX256, 0>;
 let Latency = 2 in {
@@ -643,41 +641,40 @@ let Latency = 2 in {
 }
 def : ReadAdvance<ReadVSAT128, 0>;
 def : ReadAdvance<ReadVSAT256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVSIGNCOV128, [LA464VMul]>;
-  def : WriteRes<WriteVSIGNCOV256, [LA464VMul]>;
-}
+
+def : WriteRes<WriteVSIGNCOV128, [LA464VMul]>;
+def : WriteRes<WriteVSIGNCOV256, [LA464VMul]>;
+
 def : ReadAdvance<ReadVSIGNCOV128, 0>;
 def : ReadAdvance<ReadVSIGNCOV256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVEXTH128, [LA464FPU]>;
-  def : WriteRes<WriteVEXTH256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVEXTH128, [LA464FPU]>;
+def : WriteRes<WriteVEXTH256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVEXTH128, 0>;
 def : ReadAdvance<ReadVEXTH256, 0>;
 let Latency = 3 in {
   def : WriteRes<WriteVEXT2XV256, [LA464FPU]>;
 }
 def : ReadAdvance<ReadVEXT2XV256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVEXTL128, [LA464FPU]>;
-  def : WriteRes<WriteVEXTL256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVEXTL128, [LA464FPU]>;
+def : WriteRes<WriteVEXTL256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVEXTL128, 0>;
 def : ReadAdvance<ReadVEXTL256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVLDI128, [LA464FPU]>;
-  def : WriteRes<WriteVLDI256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVLDI128, [LA464FPU]>;
+def : WriteRes<WriteVLDI256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVLDI128, 0>;
 def : ReadAdvance<ReadVLDI256, 0>;
 
 //
 // Vector compare, mask and condition flag
-let Latency = 1 in {
-  def : WriteRes<WriteVCMP128, [LA464FPU]>;
-  def : WriteRes<WriteVCMP256, [LA464FPU]>;
-}
+def : WriteRes<WriteVCMP128, [LA464FPU]>;
+def : WriteRes<WriteVCMP256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVCMP128, 0>;
 def : ReadAdvance<ReadVCMP256, 0>;
 let Latency = 2 in {
@@ -692,10 +689,10 @@ let Latency = 2 in {
 }
 def : ReadAdvance<ReadVFCMP128, 0>;
 def : ReadAdvance<ReadVFCMP256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVMSK128, [LA464FPU]>;
-  def : WriteRes<WriteVMSK256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVMSK128, [LA464FPU]>;
+def : WriteRes<WriteVMSK256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVMSK128, 0>;
 def : ReadAdvance<ReadVMSK256, 0>;
 let Latency = 2 in {
@@ -715,10 +712,9 @@ def : ReadAdvance<ReadVFRSTP256, 0>;
 
 //
 // Vector bit manipulation
-let Latency = 1 in {
-  def : WriteRes<WriteVBIT128, [LA464FPU]>;
-  def : WriteRes<WriteVBIT256, [LA464FPU]>;
-}
+def : WriteRes<WriteVBIT128, [LA464FPU]>;
+def : WriteRes<WriteVBIT256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVBIT128, 0>;
 def : ReadAdvance<ReadVBIT256, 0>;
 let Latency = 2 in {
@@ -727,10 +723,10 @@ let Latency = 2 in {
 }
 def : ReadAdvance<ReadVBITOPS128, 0>;
 def : ReadAdvance<ReadVBITOPS256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVBITSEL128, [LA464VMul]>;
-  def : WriteRes<WriteVBITSEL256, [LA464VMul]>;
-}
+
+def : WriteRes<WriteVBITSEL128, [LA464VMul]>;
+def : WriteRes<WriteVBITSEL256, [LA464VMul]>;
+
 def : ReadAdvance<ReadVBITSEL128, 0>;
 def : ReadAdvance<ReadVBITSEL256, 0>;
 let Latency = 2 in {
@@ -748,10 +744,9 @@ def : ReadAdvance<ReadVCL256, 0>;
 
 //
 // Vector shift
-let Latency = 1 in {
-  def : WriteRes<WriteVSHIFT128, [LA464FPU]>;
-  def : WriteRes<WriteVSHIFT256, [LA464FPU]>;
-}
+def : WriteRes<WriteVSHIFT128, [LA464FPU]>;
+def : WriteRes<WriteVSHIFT256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVSHIFT128, 0>;
 def : ReadAdvance<ReadVSHIFT256, 0>;
 let Latency = 3 in {
@@ -841,42 +836,41 @@ def : ReadAdvance<ReadVSHIFTRNSIQ256, 0>;
 
 //
 // Vector shuffle, permute and element move
-let Latency = 1 in {
-  def : WriteRes<WriteVPACK128, [LA464FPU]>;
-  def : WriteRes<WriteVPACK256, [LA464FPU]>;
-}
+def : WriteRes<WriteVPACK128, [LA464FPU]>;
+def : WriteRes<WriteVPACK256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVPACK128, 0>;
 def : ReadAdvance<ReadVPACK256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVSHUF128, [LA464VMul]>;
-  def : WriteRes<WriteVSHUF256, [LA464VMul]>;
-}
+
+def : WriteRes<WriteVSHUF128, [LA464VMul]>;
+def : WriteRes<WriteVSHUF256, [LA464VMul]>;
+
 def : ReadAdvance<ReadVSHUF128, 0>;
 def : ReadAdvance<ReadVSHUF256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVSHUF4I128, [LA464FPU]>;
-  def : WriteRes<WriteVSHUF4I256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVSHUF4I128, [LA464FPU]>;
+def : WriteRes<WriteVSHUF4I256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVSHUF4I128, 0>;
 def : ReadAdvance<ReadVSHUF4I256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVHSELI256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVHSELI256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVHSELI256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVPERMI128, [LA464FPU]>;
-  def : WriteRes<WriteVPERMI256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVPERMI128, [LA464FPU]>;
+def : WriteRes<WriteVPERMI256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVPERMI128, 0>;
 def : ReadAdvance<ReadVPERMI256, 0>;
 let Latency = 3 in {
   def : WriteRes<WriteVPERM256, [LA464FPU]>;
 }
 def : ReadAdvance<ReadVPERM256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVEXTRINS128, [LA464FPU]>;
-  def : WriteRes<WriteVEXTRINS256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVEXTRINS128, [LA464FPU]>;
+def : WriteRes<WriteVEXTRINS256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVEXTRINS128, 0>;
 def : ReadAdvance<ReadVEXTRINS256, 0>;
 let Latency = 3 in {
@@ -891,10 +885,10 @@ let Latency = 3 in {
   def : WriteRes<WriteVREPLVE0256, [LA464FPU]>;
 }
 def : ReadAdvance<ReadVREPLVE0256, 0>;
-let Latency = 1 in {
-  def : WriteRes<WriteVREPLVEI128, [LA464FPU]>;
-  def : WriteRes<WriteVREPLVEI256, [LA464FPU]>;
-}
+
+def : WriteRes<WriteVREPLVEI128, [LA464FPU]>;
+def : WriteRes<WriteVREPLVEI256, [LA464FPU]>;
+
 def : ReadAdvance<ReadVREPLVEI128, 0>;
 def : ReadAdvance<ReadVREPLVEI256, 0>;
 let Latency = 3 in {
@@ -1124,5 +1118,3 @@ let Unsupported = true in {
   def : WriteRes<WriteOthers, []>;
   def : ReadAdvance<ReadOthers, 0>;
 }
-
-} // SchedModel
