@@ -119,6 +119,11 @@ public:
   MachineInstr *emitLdStWithAddr(MachineInstr &MemI,
                                  const ExtAddrMode &AM) const override;
 
+  bool useMachineCombiner() const override { return true; }
+
+  bool isAssociativeAndCommutative(const MachineInstr &Inst,
+                                   bool Invert) const override;
+
 protected:
   const LoongArchSubtarget &STI;
 };
